@@ -10,21 +10,19 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# File download setup
-MODEL_URL_ID = "1pBhNYNUDbssgD4wTi32c-pL2VkN9ZtiQ"
-CLASS_JSON_ID = "1IpwcBjs-NXLMmqPaH21c0TGjOCF-kXhA"
+# Download model and class_names.json
+model_path = "mobilenetv2_best.h5"
+class_path = "class_names.json"
 
-# Ensure model file is available
-if not os.path.exists("mobilenetv2_best.h5"):
-    gdown.download(id=MODEL_URL_ID, output="mobilenetv2_best.h5", quiet=False)
+if not os.path.exists(model_path):
+    gdown.download("https://drive.google.com/uc?id=1pBhNYNUDbssgD4wTi32c-pL2VkN9ZtiQ", model_path, quiet=False)
 
-# Ensure class names file is available
-if not os.path.exists("class_names.json"):
-    gdown.download(id=CLASS_JSON_ID, output="class_names.json", quiet=False)
+if not os.path.exists(class_path):
+    gdown.download("https://drive.google.com/uc?id=1IpwcBjs-NXLMmqPaH21c0TGjOCF-kXhA", class_path, quiet=False)
 
-# Load model and class labels
-model = load_model('mobilenetv2_best.h5')
-with open("class_names.json", "r") as f:
+model = load_model(model_path)
+
+with open(class_path, "r") as f:
     class_names = json.load(f)
 
 @app.route("/", methods=["GET", "POST"])
@@ -33,22 +31,23 @@ def index():
     filename = None
 
     if request.method == "POST":
-        img_file = request.files["image"]
-        if img_file:
-            filename = img_file.filename
-            path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            img_file.save(path)
+        try:
+            img_file = request.files["image"]
+            if img_file:
+                filename = img_file.filename
+                path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                img_file.save(path)
 
-            # Preprocess image
-            img = image.load_img(path, target_size=(224, 224))
-            img_array = image.img_to_array(img) / 255.0
-            img_array = np.expand_dims(img_array, axis=0)
+                img = image.load_img(path, target_size=(224, 224))
+                img_array = image.img_to_array(img) / 255.0
+                img_array = np.expand_dims(img_array, axis=0)
 
-            # Predict
-            preds = model.predict(img_array)
-            class_idx = np.argmax(preds)
-            confidence = round(100 * np.max(preds), 2)
-            prediction = f"{class_names[class_idx]} ({confidence}%)"
+                preds = model.predict(img_array)
+                class_idx = np.argmax(preds)
+                confidence = round(100 * np.max(preds), 2)
+                prediction = f"{class_names[class_idx]} ({confidence}%)"
+        except Exception as e:
+            prediction = f"Error: {str(e)}"
 
     return render_template("index.html", prediction=prediction, filename=filename)
 
